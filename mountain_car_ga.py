@@ -318,7 +318,7 @@ if __name__ == "__main__":
     best_individual, history = train()
 
     print("\nTesting best evolved individual...")
-    test_individual(best_individual, render=False)
+    test_individual(best_individual, render=True)
 
     print("\nSaved files:")
     print("- results.csv")
