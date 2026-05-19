@@ -4,6 +4,37 @@ This project solves the `MountainCar-v0` Gymnasium environment with a Genetic
 Algorithm. Each individual is a discrete policy table, and the algorithm evolves
 a population of policies over multiple generations.
 
+## Environment Reward And Actions
+
+The agent chooses one action at every time step:
+
+- `0`: accelerate left
+- `1`: do nothing
+- `2`: accelerate right
+
+The environment gives a reward of `-1` for each action/time step. This means a
+policy receives a better total reward when it reaches the goal in fewer steps.
+Many unsuccessful policies still receive a similar reward near `-200`, so the
+fitness function also gives a stronger bonus for moving farther toward the goal.
+
+## Fitness Improvements
+
+The current fitness function is:
+
+```text
+fitness = total_reward + progress_bonus + goal_bonus
+```
+
+`progress_bonus` measures how much of the distance from the start position to
+the goal was covered by the best position reached in the episode. This gives
+more importance to policies that move the car farther toward the goal, even
+before they can solve the environment completely.
+
+The Genetic Algorithm also uses an adaptive mutation rate. Mutation starts high
+to support exploration and gradually decreases to preserve good solutions in
+later generations. The crossover rate was adjusted to balance recombination with
+exploration.
+
 ## Setup
 
 Create and activate a virtual environment:
@@ -43,6 +74,10 @@ the same validation seeds.
 - `generation_steps_to_goal_plot.png`: average steps to goal, with failed runs
   counted as `MAX_STEPS`.
 - `generation_success_rate_plot.png`: success rate of each generation champion.
+- `randomization_effects.csv`: reward, progress bonus, goal bonus, and fitness
+  for the best solution under different random seeds.
+- `randomization_effect_plot.png`: plot showing how random seeds affect reward
+  and fitness bonus components.
 
 ## What to Check
 
@@ -50,4 +85,5 @@ Use `fitness_plot.png` to confirm that the training process improves over time.
 Then use the generation comparison plots to check whether the best solution from
 each generation actually performs better under the same validation conditions.
 `generation_comparison.csv` contains the exact numerical values used in those
-plots.
+plots. Use `randomization_effect_plot.png` to check whether the final solution is
+stable across different random seeds.
