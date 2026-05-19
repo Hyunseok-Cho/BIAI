@@ -12,8 +12,9 @@ POPULATION_SIZE = 80
 GENERATIONS = 60
 ELITE_SIZE = 6
 TOURNAMENT_SIZE = 5
-MUTATION_RATE = 0.02
-CROSSOVER_RATE = 0.9
+INITIAL_MUTATION_RATE = 0.05
+FINAL_MUTATION_RATE = 0.01
+CROSSOVER_RATE = 0.85
 
 POSITION_BINS = 20
 VELOCITY_BINS = 20
@@ -21,14 +22,34 @@ VELOCITY_BINS = 20
 EPISODES_PER_INDIVIDUAL = 3
 MAX_STEPS = 200
 
+POSITION_MIN = -1.2
+POSITION_MAX = 0.6
+VELOCITY_MIN = -0.07
+VELOCITY_MAX = 0.07
+GOAL_POSITION = 0.5
+STEP_REWARD = -1
+PROGRESS_WEIGHT = 500
+GOAL_BONUS = 200
+
+ACTION_MEANINGS = {
+    0: "accelerate left",
+    1: "do nothing",
+    2: "accelerate right",
+}
+
 RANDOM_SEED = 42
 VALIDATION_EPISODES = 10
 VALIDATION_SEEDS = [
     RANDOM_SEED + 1000 + seed_index for seed_index in range(VALIDATION_EPISODES)
 ]
+RANDOMIZATION_TRIALS = 20
+RANDOMIZATION_SEEDS = [
+    RANDOM_SEED + 2000 + seed_index for seed_index in range(RANDOMIZATION_TRIALS)
+]
 
 CHAMPIONS_DIR = Path("generation_champions")
 COMPARISON_RESULTS_FILE = "generation_comparison.csv"
+RANDOMIZATION_RESULTS_FILE = "randomization_effects.csv"
 RENDER_FINAL_TEST = False
 
 
@@ -44,18 +65,12 @@ def discretize_observation(observation):
     position = observation[0]
     velocity = observation[1]
 
-    position_min = -1.2
-    position_max = 0.6
-
-    velocity_min = -0.07
-    velocity_max = 0.07
-
     position_index = int(
-        (position - position_min) / (position_max - position_min) * POSITION_BINS
+        (position - POSITION_MIN) / (POSITION_MAX - POSITION_MIN) * POSITION_BINS
     )
 
     velocity_index = int(
-        (velocity - velocity_min) / (velocity_max - velocity_min) * VELOCITY_BINS
+        (velocity - VELOCITY_MIN) / (VELOCITY_MAX - VELOCITY_MIN) * VELOCITY_BINS
     )
 
     position_index = np.clip(position_index, 0, POSITION_BINS - 1)
@@ -82,15 +97,18 @@ def run_policy_episode(individual, seed=None, render=False):
         observation, info = env.reset(seed=seed)
 
     total_reward = 0.0
+    start_position = observation[0]
     max_position = observation[0]
     reached_goal = False
     steps_taken = 0
+    final_position = observation[0]
 
     for step in range(MAX_STEPS):
         action = get_action(individual, observation)
         observation, reward, terminated, truncated, info = env.step(action)
 
         total_reward += reward
+        final_position = observation[0]
         max_position = max(max_position, observation[0])
         steps_taken = step + 1
 
@@ -105,6 +123,8 @@ def run_policy_episode(individual, seed=None, render=False):
 
     return {
         "total_reward": float(total_reward),
+        "start_position": float(start_position),
+        "final_position": float(final_position),
         "max_position": float(max_position),
         "reached_goal": reached_goal,
         "steps_taken": steps_taken,
@@ -112,13 +132,45 @@ def run_policy_episode(individual, seed=None, render=False):
     }
 
 
-def calculate_fitness(total_reward, max_position, reached_goal):
-    fitness = total_reward + 100 * max_position
+def calculate_goal_progress(start_position, max_position):
+    distance_to_goal = GOAL_POSITION - start_position
 
-    if reached_goal:
-        fitness += 100
+    if distance_to_goal <= 0:
+        return 1.0
 
-    return fitness
+    progress = (max_position - start_position) / distance_to_goal
+    return float(np.clip(progress, 0.0, 1.0))
+
+
+def calculate_fitness_components(
+    total_reward,
+    start_position,
+    max_position,
+    reached_goal,
+):
+    goal_progress = calculate_goal_progress(start_position, max_position)
+    progress_bonus = PROGRESS_WEIGHT * goal_progress
+    goal_bonus = GOAL_BONUS if reached_goal else 0
+    fitness = total_reward + progress_bonus + goal_bonus
+
+    return {
+        "reward_component": float(total_reward),
+        "goal_progress": goal_progress,
+        "progress_bonus": float(progress_bonus),
+        "goal_bonus": float(goal_bonus),
+        "fitness": float(fitness),
+    }
+
+
+def calculate_fitness(total_reward, start_position, max_position, reached_goal):
+    components = calculate_fitness_components(
+        total_reward,
+        start_position,
+        max_position,
+        reached_goal,
+    )
+
+    return components["fitness"]
 
 
 def create_individual():
@@ -137,6 +189,7 @@ def evaluate_individual(individual):
         episode_result = run_policy_episode(individual)
         fitness = calculate_fitness(
             episode_result["total_reward"],
+            episode_result["start_position"],
             episode_result["max_position"],
             episode_result["reached_goal"],
         )
@@ -150,10 +203,31 @@ def evaluate_champion(individual, seeds):
         run_policy_episode(individual, seed=seed)
         for seed in seeds
     ]
+    fitness_components = [
+        calculate_fitness_components(
+            result["total_reward"],
+            result["start_position"],
+            result["max_position"],
+            result["reached_goal"],
+        )
+        for result in episode_results
+    ]
 
     rewards = [result["total_reward"] for result in episode_results]
     max_positions = [result["max_position"] for result in episode_results]
     steps_to_goal = [result["steps_to_goal"] for result in episode_results]
+    goal_progress_values = [
+        components["goal_progress"] for components in fitness_components
+    ]
+    progress_bonuses = [
+        components["progress_bonus"] for components in fitness_components
+    ]
+    goal_bonuses = [
+        components["goal_bonus"] for components in fitness_components
+    ]
+    fitness_values = [
+        components["fitness"] for components in fitness_components
+    ]
     successful_steps = [
         result["steps_to_goal"]
         for result in episode_results
@@ -173,6 +247,10 @@ def evaluate_champion(individual, seeds):
         "average_reward": float(np.mean(rewards)),
         "average_max_position": float(np.mean(max_positions)),
         "average_steps_to_goal": float(np.mean(steps_to_goal)),
+        "average_goal_progress": float(np.mean(goal_progress_values)),
+        "average_progress_bonus": float(np.mean(progress_bonuses)),
+        "average_goal_bonus": float(np.mean(goal_bonuses)),
+        "average_fitness": float(np.mean(fitness_values)),
         "successful_average_steps_to_goal": successful_average_steps,
     }
 
@@ -211,15 +289,25 @@ def crossover(parent1, parent2):
     return child1, child2
 
 
-def mutate(individual):
+def get_mutation_rate(generation):
+    if GENERATIONS <= 1:
+        return FINAL_MUTATION_RATE
+
+    generation_progress = generation / (GENERATIONS - 1)
+    return INITIAL_MUTATION_RATE + (
+        FINAL_MUTATION_RATE - INITIAL_MUTATION_RATE
+    ) * generation_progress
+
+
+def mutate(individual, mutation_rate):
     for i in range(len(individual)):
-        if random.random() < MUTATION_RATE:
+        if random.random() < mutation_rate:
             individual[i] = random.randint(0, 2)
 
     return individual
 
 
-def create_next_generation(population, fitness_scores):
+def create_next_generation(population, fitness_scores, mutation_rate):
     sorted_indices = np.argsort(fitness_scores)[::-1]
 
     next_generation = []
@@ -234,8 +322,8 @@ def create_next_generation(population, fitness_scores):
 
         child1, child2 = crossover(parent1, parent2)
 
-        child1 = mutate(child1)
-        child2 = mutate(child2)
+        child1 = mutate(child1, mutation_rate)
+        child2 = mutate(child2, mutation_rate)
 
         next_generation.append(child1)
 
@@ -271,6 +359,16 @@ def compare_generation_champions(generation_champions, history):
             "validation_average_steps_to_goal": validation_summary[
                 "average_steps_to_goal"
             ],
+            "validation_average_goal_progress": validation_summary[
+                "average_goal_progress"
+            ],
+            "validation_average_progress_bonus": validation_summary[
+                "average_progress_bonus"
+            ],
+            "validation_average_goal_bonus": validation_summary[
+                "average_goal_bonus"
+            ],
+            "validation_average_fitness": validation_summary["average_fitness"],
             "validation_success_rate": validation_summary["success_rate"],
             "validation_successful_episodes": validation_summary[
                 "successful_episodes"
@@ -287,11 +385,54 @@ def compare_generation_champions(generation_champions, history):
             f"Reward: {comparison_row['validation_average_reward']:.2f} | "
             f"Max position: "
             f"{comparison_row['validation_average_max_position']:.4f} | "
+            f"Progress bonus: "
+            f"{comparison_row['validation_average_progress_bonus']:.2f} | "
             f"Success rate: "
             f"{comparison_row['validation_success_rate'] * 100:.1f}%"
         )
 
     return comparison_history
+
+
+def analyze_randomization_effects(individual, seeds):
+    randomization_history = []
+
+    print("\nChecking randomization effects on reward and bonus...")
+
+    for trial_index, seed in enumerate(seeds, start=1):
+        episode_result = run_policy_episode(individual, seed=seed)
+        fitness_components = calculate_fitness_components(
+            episode_result["total_reward"],
+            episode_result["start_position"],
+            episode_result["max_position"],
+            episode_result["reached_goal"],
+        )
+
+        row = {
+            "trial": trial_index,
+            "seed": seed,
+            "total_reward": episode_result["total_reward"],
+            "start_position": episode_result["start_position"],
+            "final_position": episode_result["final_position"],
+            "max_position": episode_result["max_position"],
+            "goal_progress": fitness_components["goal_progress"],
+            "progress_bonus": fitness_components["progress_bonus"],
+            "goal_bonus": fitness_components["goal_bonus"],
+            "fitness": fitness_components["fitness"],
+            "reached_goal": episode_result["reached_goal"],
+            "steps_to_goal": episode_result["steps_to_goal"],
+        }
+        randomization_history.append(row)
+
+        print(
+            f"Seed {seed} | "
+            f"Reward: {row['total_reward']:.2f} | "
+            f"Progress bonus: {row['progress_bonus']:.2f} | "
+            f"Goal bonus: {row['goal_bonus']:.2f} | "
+            f"Fitness: {row['fitness']:.2f}"
+        )
+
+    return randomization_history
 
 
 def train():
@@ -310,6 +451,7 @@ def train():
         generation_average = sum(fitness_scores) / len(fitness_scores)
         generation_best_index = fitness_scores.index(generation_best)
         generation_best_individual = population[generation_best_index].copy()
+        mutation_rate = get_mutation_rate(generation)
 
         generation_champions.append(generation_best_individual)
         save_generation_champion(generation_best_individual, generation + 1)
@@ -324,6 +466,8 @@ def train():
                 "best_fitness": generation_best,
                 "average_fitness": generation_average,
                 "overall_best_fitness": best_fitness,
+                "mutation_rate": mutation_rate,
+                "crossover_rate": CROSSOVER_RATE,
             }
         )
 
@@ -331,10 +475,15 @@ def train():
             f"Generation {generation + 1:03d} | "
             f"Best: {generation_best:.2f} | "
             f"Average: {generation_average:.2f} | "
-            f"Overall best: {best_fitness:.2f}"
+            f"Overall best: {best_fitness:.2f} | "
+            f"Mutation: {mutation_rate:.3f}"
         )
 
-        population = create_next_generation(population, fitness_scores)
+        population = create_next_generation(
+            population,
+            fitness_scores,
+            mutation_rate,
+        )
 
     save_results(history)
     save_plot(history)
@@ -342,8 +491,14 @@ def train():
     save_generation_comparison_results(comparison_history)
     save_comparison_plots(comparison_history)
     np.save("best_individual.npy", best_individual)
+    randomization_history = analyze_randomization_effects(
+        best_individual,
+        RANDOMIZATION_SEEDS,
+    )
+    save_randomization_results(randomization_history)
+    save_randomization_plot(randomization_history)
 
-    return best_individual, history, comparison_history
+    return best_individual, history, comparison_history, randomization_history
 
 
 def save_results(history):
@@ -355,6 +510,8 @@ def save_results(history):
                 "best_fitness",
                 "average_fitness",
                 "overall_best_fitness",
+                "mutation_rate",
+                "crossover_rate",
             ],
         )
 
@@ -375,6 +532,10 @@ def save_generation_comparison_results(comparison_history):
                 "validation_average_reward",
                 "validation_average_max_position",
                 "validation_average_steps_to_goal",
+                "validation_average_goal_progress",
+                "validation_average_progress_bonus",
+                "validation_average_goal_bonus",
+                "validation_average_fitness",
                 "validation_success_rate",
                 "validation_successful_episodes",
                 "validation_episodes",
@@ -385,6 +546,32 @@ def save_generation_comparison_results(comparison_history):
         writer.writeheader()
 
         for row in comparison_history:
+            writer.writerow(row)
+
+
+def save_randomization_results(randomization_history):
+    with open(RANDOMIZATION_RESULTS_FILE, "w", newline="") as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "trial",
+                "seed",
+                "total_reward",
+                "start_position",
+                "final_position",
+                "max_position",
+                "goal_progress",
+                "progress_bonus",
+                "goal_bonus",
+                "fitness",
+                "reached_goal",
+                "steps_to_goal",
+            ],
+        )
+
+        writer.writeheader()
+
+        for row in randomization_history:
             writer.writerow(row)
 
 
@@ -427,6 +614,42 @@ def save_metric_plot(
     plt.close()
 
 
+def save_randomization_plot(randomization_history):
+    trials = [row["trial"] for row in randomization_history]
+    rewards = [row["total_reward"] for row in randomization_history]
+    progress_bonuses = [row["progress_bonus"] for row in randomization_history]
+    goal_bonuses = [row["goal_bonus"] for row in randomization_history]
+    fitness_values = [row["fitness"] for row in randomization_history]
+
+    figure, axes = plt.subplots(2, 2, figsize=(12, 8))
+    axes = axes.flatten()
+
+    axes[0].plot(trials, rewards, marker="o")
+    axes[0].set_title("Reward by Random Seed")
+    axes[0].set_ylabel("Total reward")
+
+    axes[1].plot(trials, progress_bonuses, marker="o", color="tab:green")
+    axes[1].set_title("Progress Bonus by Random Seed")
+    axes[1].set_ylabel("Progress bonus")
+
+    axes[2].plot(trials, goal_bonuses, marker="o", color="tab:orange")
+    axes[2].set_title("Goal Bonus by Random Seed")
+    axes[2].set_ylabel("Goal bonus")
+
+    axes[3].plot(trials, fitness_values, marker="o", color="tab:red")
+    axes[3].set_title("Final Fitness by Random Seed")
+    axes[3].set_ylabel("Fitness")
+
+    for axis in axes:
+        axis.set_xlabel("Trial")
+        axis.grid(True)
+
+    figure.suptitle("Randomization Effects on Reward and Fitness Bonuses")
+    figure.tight_layout()
+    figure.savefig("randomization_effect_plot.png")
+    plt.close(figure)
+
+
 def save_comparison_plots(comparison_history):
     save_metric_plot(
         comparison_history,
@@ -461,10 +684,20 @@ def save_comparison_plots(comparison_history):
 
 def test_individual(individual, render=False):
     result = run_policy_episode(individual, render=render)
+    fitness_components = calculate_fitness_components(
+        result["total_reward"],
+        result["start_position"],
+        result["max_position"],
+        result["reached_goal"],
+    )
 
     print("Test result")
     print(f"Total reward: {result['total_reward']}")
     print(f"Max position: {result['max_position']:.4f}")
+    print(f"Goal progress: {fitness_components['goal_progress']:.4f}")
+    print(f"Progress bonus: {fitness_components['progress_bonus']:.2f}")
+    print(f"Goal bonus: {fitness_components['goal_bonus']:.2f}")
+    print(f"Fitness: {fitness_components['fitness']:.2f}")
     print(f"Reached goal: {result['reached_goal']}")
     print(f"Steps to goal: {result['steps_to_goal']}")
 
@@ -502,7 +735,7 @@ if __name__ == "__main__":
     test_random_policy()
 
     print("\nTraining Genetic Algorithm...")
-    best_individual, history, comparison_history = train()
+    best_individual, history, comparison_history, randomization_history = train()
 
     print("\nTesting best evolved individual...")
     test_individual(best_individual, render=RENDER_FINAL_TEST)
@@ -517,3 +750,5 @@ if __name__ == "__main__":
     print("- generation_max_position_plot.png")
     print("- generation_steps_to_goal_plot.png")
     print("- generation_success_rate_plot.png")
+    print("- randomization_effects.csv")
+    print("- randomization_effect_plot.png")

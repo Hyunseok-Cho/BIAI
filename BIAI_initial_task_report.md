@@ -24,6 +24,19 @@ The agent can choose one of three actions:
 - `1` — do nothing
 - `2` — accelerate to the right
 
+Each action is executed for one time step. In `MountainCar-v0`, the environment
+gives a reward of `-1` for every time step until the episode ends. Therefore,
+reaching the goal in fewer steps gives a better total reward. If the agent fails
+to reach the goal within the maximum number of steps, many policies receive a
+similar reward near `-200`.
+
+Example:
+
+| Case | Result | Total reward meaning |
+|---|---|---|
+| Successful policy | reaches the goal in 112 steps | `-112`, because the agent used 112 actions |
+| Failed policy | does not reach the goal within 200 steps | `-200`, because the episode reaches the maximum step limit |
+
 The goal of the agent is to reach the target position as quickly as possible.
 
 ---
@@ -52,6 +65,13 @@ The implementation produces the following output files:
 - `results.csv` — numerical results from training
 - `fitness_plot.png` — graph of best and average fitness over generations
 - `best_individual.npy` — saved best evolved policy
+
+Additional comparison outputs were added after the first feedback:
+
+- `generation_comparison.csv`: comparison of each generation champion
+- `randomization_effects.csv`: effect of random seeds on reward and bonuses
+- generation comparison plots for reward, max position, steps, and success rate
+- `randomization_effect_plot.png`: randomization effect plot
 
 ---
 
@@ -89,11 +109,65 @@ The fitness function measures how good each individual is.
 
 In the MountainCar-v0 environment, the agent receives -1 reward at each time step. This means that reaching the goal faster gives a better result. However, many random policies fail and receive very similar rewards.
 
-Because of this, the fitness function also includes a bonus based on the maximum position reached by the car. This helps the Genetic Algorithm distinguish between policies that completely fail and policies that move closer to the goal.
+Because of this, the fitness function also includes a stronger bonus based on
+how far the car moves toward the goal. This helps the Genetic Algorithm
+distinguish between policies that completely fail and policies that move closer
+to the goal.
 
 The fitness function is based on:
 
-```total reward + maximum position bonus + goal bonus```
+```total reward + progress bonus + goal bonus```
+
+The progress bonus is calculated from the best position reached during the
+episode. It measures how much of the distance from the start position to the goal
+was covered. This gives more importance to moving in the correct direction, even
+before the policy can reach the goal consistently.
+
+Example fitness cases:
+
+| Case | Total reward | Goal progress | Progress bonus | Goal bonus | Final fitness |
+|---|---:|---:|---:|---:|---:|
+| Failed, small movement toward goal | `-200` | `0.20` | `100` | `0` | `-100` |
+| Failed, strong movement toward goal | `-200` | `0.70` | `350` | `0` | `150` |
+| Successful final policy | `-112` | `1.00` | `500` | `200` | `588` |
+
+This shows why the new fitness is useful. Two failed policies can have the same
+environment reward of `-200`, but the policy that moved farther toward the goal
+receives a much better fitness score.
+
+The implementation also checks the final best policy under several random seeds.
+This is used to observe how randomization affects reward, progress bonus, goal
+bonus, and final fitness.
+
+Example from the final policy randomization check:
+
+| Seed | Total reward | Progress bonus | Goal bonus | Fitness | Result |
+|---:|---:|---:|---:|---:|---|
+| `2045` | `-104` | `500` | `200` | `596` | reached goal |
+| `2061` | `-123` | `500` | `200` | `577` | reached goal |
+
+The reward changes because the number of steps changes under different random
+seeds. However, the progress bonus and goal bonus remain stable in these cases,
+which means the final policy still reaches the goal.
+
+The mutation and crossover settings were also adjusted. Mutation starts higher
+to support exploration in early generations and gradually decreases to preserve
+good solutions in later generations. The crossover rate was slightly reduced to
+balance recombination with exploration.
+
+Example mutation schedule:
+
+| Generation | Mutation rate | Expected changed genes in a 400-gene policy |
+|---:|---:|---:|
+| Early generation | about `0.05` | about `20` genes |
+| Middle generation | about `0.03` | about `12` genes |
+| Final generation | about `0.01` | about `4` genes |
+
+This gives the algorithm more exploration at the beginning and more stability at
+the end. The crossover rate is `0.85`, so most children are still created by
+combining two parents, but the lower mutation rate near the end helps preserve
+good policies.
+
 ### Selection
 
 Selection is the process of choosing better individuals as parents.
