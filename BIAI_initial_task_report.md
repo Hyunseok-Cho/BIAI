@@ -206,3 +206,57 @@ So far, we have:
 The final evolved policy was able to reach the goal in the Mountain Car environment.
 
 This confirms that the Genetic Algorithm was able to improve the agent's behavior over generations.
+
+## 5. Graphical Representation of the Environment
+
+To address the feedback about developing a graphical representation of the
+environment, an additional visualization program was added:
+
+```text
+visualize_best_solution.py
+```
+
+This file does not train the Genetic Algorithm again. Instead, it loads the
+already saved best policy from:
+
+```text
+best_individual.npy
+```
+
+Then it runs the policy inside the `MountainCar-v0` environment so that the
+movement of the car can be observed directly.
+
+### How to run the live visualization
+
+The following command opens a live rendering window:
+
+```powershell
+python visualize_best_solution.py
+```
+
+This is useful during the presentation because it shows the best evolved policy
+controlling the car in the actual environment.
+
+### How to save a screenshot
+
+The following command saves the final rendered frame as an image:
+
+```powershell
+python visualize_best_solution.py --mode screenshot --seed 2042 --output best_solution_screenshot.png
+```
+
+The seed controls the initial state of the environment. In this example, seed
+`2042` was used. The same trained policy is used every time; only the initial
+environment state changes with the seed.
+
+### Screenshot
+
+The screenshot below shows the saved best policy reaching the goal area on the
+right hill.
+
+![Best solution reaching the MountainCar goal](best_solution_screenshot.png)
+
+For the screenshot run with seed `2042`, the policy reached the goal in `156`
+steps. The total reward was `-156`, the progress bonus was `500`, and the goal
+bonus was `200`. This confirms that the saved best policy can be loaded and
+visually checked without retraining the Genetic Algorithm.

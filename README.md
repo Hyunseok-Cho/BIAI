@@ -62,6 +62,21 @@ The script trains the Genetic Algorithm, saves the best final policy, saves the
 best champion from each generation, and compares those generation champions with
 the same validation seeds.
 
+## Visualize Best Solution
+
+After training has created `best_individual.npy`, run the saved best policy in a
+live MountainCar window with:
+
+```powershell
+python visualize_best_solution.py
+```
+
+Save a screenshot of the final rendered frame with:
+
+```powershell
+python visualize_best_solution.py --mode screenshot --seed 2042 --output best_solution_screenshot.png
+```
+
 ## Output Files
 
 - `results.csv`: training fitness values for each generation.
@@ -78,6 +93,8 @@ the same validation seeds.
   for the best solution under different random seeds.
 - `randomization_effect_plot.png`: plot showing how random seeds affect reward
   and fitness bonus components.
+- `best_solution_screenshot.png`: screenshot generated from the saved best
+  policy visualization.
 
 ## What to Check
 
