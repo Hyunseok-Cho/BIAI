@@ -125,7 +125,7 @@ The best individual in the current generation is called the generation champion.
 It is saved as:
 
 ```text
-generation_champions/generation_XXX.npy
+DATA/generation_champions/generation_XXX.npy
 ```
 
 The algorithm also tracks the overall best individual found across all
@@ -238,7 +238,7 @@ new candidate policies from them.
 | 10 | Apply mutation | Randomly change some actions in the child policies using the current adaptive mutation rate. |
 | 11 | Create next generation | Fill the next population with elites and newly created children. |
 | 12 | Repeat | Continue the process until the final generation is reached. |
-| 13 | Save final best solution | Save the best policy as `best_individual.npy`. |
+| 13 | Save final best solution | Save the best policy as `DATA/best_individual.npy`. |
 | 14 | Validate and visualize | Compare generation champions, analyze random seed effects, and run the saved best policy visually. |
 
 The key idea is that every generation contains both preservation and exploration.
@@ -251,4 +251,4 @@ fewer steps.
 
 The diagram below shows the full workflow of the Genetic Algorithm.
 
-![Task 3 Genetic Algorithm Flow-chart](task3_algorithm_flowchart.png)
+![Task 3 Genetic Algorithm Flow-chart](../DATA/task3_algorithm_flowchart.png)

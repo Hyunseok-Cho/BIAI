@@ -5,7 +5,7 @@
 
 This document expands the main algorithm from the Task 3 report. It explains
 each block of the Genetic Algorithm in execution order and connects each block
-to the actual implementation in `mountain_car_ga.py`.
+to the actual implementation in `IMPL/mountain_car_ga.py`.
 
 The purpose of this document is not to redefine the whole project. Instead, it
 explains how each algorithm step starts, what logic it uses, how it proceeds,
@@ -182,6 +182,27 @@ This means:
 The real policy table has 400 entries, not just four. The first generation
 contains 80 of these random policy tables.
 
+### Loop Walk-through
+
+The population creation loop is written as a list comprehension:
+
+```python
+return [create_individual() for _ in range(POPULATION_SIZE)]
+```
+
+It behaves like a normal loop that repeats 80 times.
+
+Example flow:
+
+| Loop index | What happens | Result |
+|---:|---|---|
+| `i = 0` | `create_individual()` creates the first random 400-gene policy. | Stored as `population[0]`. |
+| `i = 1` | `create_individual()` creates the second random policy. | Stored as `population[1]`. |
+| `i = 2` | `create_individual()` creates the third random policy. | Stored as `population[2]`. |
+
+The same process continues until `i = 79`. After that, the population has 80
+individuals and the loop stops.
+
 ### How The Step Finishes
 
 This step finishes when `population` contains 80 randomly generated policies.
@@ -244,6 +265,53 @@ The algorithm evaluates all 80 policies in the population. Each policy is not
 tested only once. It is tested `EPISODES_PER_INDIVIDUAL = 3` times, and the
 average fitness is used.
 
+### Loop Walk-through: Population Evaluation
+
+The first loop in this block is:
+
+```python
+for individual in population:
+    fitness = evaluate_individual(individual)
+    fitness_scores.append(fitness)
+```
+
+Example flow:
+
+| Loop index | What happens | Result |
+|---:|---|---|
+| `i = 0` | The algorithm evaluates `population[0]`. | The average fitness is appended as `fitness_scores[0]`. |
+| `i = 1` | The algorithm evaluates `population[1]`. | The average fitness is appended as `fitness_scores[1]`. |
+| `i = 2` | The algorithm evaluates `population[2]`. | The average fitness is appended as `fitness_scores[2]`. |
+
+The loop continues until all 80 policies have been evaluated. At the end,
+`fitness_scores` also has 80 values, so each policy has one matching fitness
+score.
+
+### Loop Walk-through: Episodes Per Individual
+
+Inside `evaluate_individual()`, each policy is tested three times:
+
+```python
+for _ in range(EPISODES_PER_INDIVIDUAL):
+    episode_result = run_policy_episode(individual)
+    fitness = calculate_fitness(...)
+    total_fitness += fitness
+```
+
+Example flow for one individual:
+
+| Loop index | What happens | Result |
+|---:|---|---|
+| `i = 0` | Run the policy in episode 1 and calculate fitness. | Add episode 1 fitness to `total_fitness`. |
+| `i = 1` | Run the same policy again in episode 2. | Add episode 2 fitness to `total_fitness`. |
+| `i = 2` | Run the same policy again in episode 3. | Add episode 3 fitness to `total_fitness`. |
+
+After the third episode, the function returns:
+
+```text
+average fitness = total_fitness / 3
+```
+
 This averaging is important because MountainCar can reset with different initial
 conditions. If a policy is lucky in one episode, that one result should not
 dominate the entire selection process. Averaging over multiple episodes gives a
@@ -290,6 +358,25 @@ for step in range(MAX_STEPS):
     if truncated:
         break
 ```
+
+### Loop Walk-through: Environment Step Loop
+
+Inside `run_policy_episode()`, the policy can interact with the environment for
+up to `MAX_STEPS = 200` steps.
+
+Example flow:
+
+| Loop index | What happens | Result |
+|---:|---|---|
+| `step = 0` | The initial observation is converted to a state index, and the policy chooses an action. | The environment returns the next observation and reward `-1`. |
+| `step = 1` | The new observation is converted again, and the next action is selected. | `total_reward` becomes `-2`, and `max_position` is updated if needed. |
+| `step = 2` | The same action-selection process repeats for the third environment step. | `total_reward` becomes `-3`, unless the episode ended earlier. |
+
+The loop continues until one of these conditions happens:
+
+- the car reaches the goal, so `terminated` becomes `True`,
+- the environment reaches the step limit, so `truncated` becomes `True`,
+- the loop reaches `MAX_STEPS`.
 
 The episode returns the values needed for fitness calculation:
 
@@ -525,7 +612,7 @@ The champion is saved to disk:
 
 ```python
 def save_generation_champion(individual, generation):
-    CHAMPIONS_DIR.mkdir(exist_ok=True)
+    CHAMPIONS_DIR.mkdir(parents=True, exist_ok=True)
     file_path = CHAMPIONS_DIR / f"generation_{generation:03d}.npy"
     np.save(file_path, individual)
 ```
@@ -543,12 +630,12 @@ from later changes.
 The champion is stored in two ways:
 
 1. In memory, inside `generation_champions`.
-2. On disk, inside `generation_champions/generation_XXX.npy`.
+2. On disk, inside `DATA/generation_champions/generation_XXX.npy`.
 
 For example, the champion from generation 7 is saved as:
 
 ```text
-generation_champions/generation_007.npy
+DATA/generation_champions/generation_007.npy
 ```
 
 ### How The Step Finishes
@@ -663,6 +750,27 @@ best fitness comes first.
 `ELITE_SIZE = 6`, so the top 6 policies are copied directly into
 `next_generation`.
 
+### Loop Walk-through
+
+The elite loop is:
+
+```python
+for i in range(ELITE_SIZE):
+    elite_index = sorted_indices[i]
+    next_generation.append(population[elite_index].copy())
+```
+
+Example flow:
+
+| Loop index | What happens | Result |
+|---:|---|---|
+| `i = 0` | Read `sorted_indices[0]`, which is the best policy index. | Copy the best policy into `next_generation[0]`. |
+| `i = 1` | Read `sorted_indices[1]`, which is the second-best policy index. | Copy the second-best policy into `next_generation[1]`. |
+| `i = 2` | Read `sorted_indices[2]`, which is the third-best policy index. | Copy the third-best policy into `next_generation[2]`. |
+
+The loop continues until `i = 5`. At that point, 6 elite policies have been
+copied without crossover or mutation.
+
 This prevents the algorithm from losing strong policies. Without elitism, a
 good policy could disappear if it is not selected as a parent, or if mutation
 damages its children.
@@ -746,6 +854,32 @@ Tournament selection creates a useful balance:
   easier tournament.
 
 This keeps selection pressure while preserving some diversity.
+
+### Loop Walk-through
+
+The tournament comparison loop is:
+
+```python
+for index in selected_indices:
+    if fitness_scores[index] > fitness_scores[best_index]:
+        best_index = index
+```
+
+Example with five sampled candidates:
+
+```text
+selected_indices = [12, 44, 8, 51, 3]
+fitness values   = [130, 220, 170, 90, 300]
+```
+
+| Loop index | Candidate checked | What happens |
+|---:|---:|---|
+| `i = 0` | `index = 12` | This is the initial best candidate, so `best_index = 12`. |
+| `i = 1` | `index = 44` | Fitness `220` is higher than `130`, so `best_index` becomes `44`. |
+| `i = 2` | `index = 8` | Fitness `170` is lower than `220`, so `best_index` stays `44`. |
+
+The loop continues for `index = 51` and `index = 3`. At the end, candidate `3`
+wins because its fitness is `300`, the highest value in the tournament.
 
 ### How The Step Finishes
 
@@ -881,6 +1015,27 @@ if random value < current mutation rate:
     replace this action with random action 0, 1, or 2
 ```
 
+### Loop Walk-through
+
+The mutation loop is:
+
+```python
+for i in range(len(individual)):
+    if random.random() < mutation_rate:
+        individual[i] = random.randint(0, 2)
+```
+
+Example with `mutation_rate = 0.05`:
+
+| Loop index | What happens | Result |
+|---:|---|---|
+| `i = 0` | Generate a random value for gene `0`. Suppose it is `0.72`. | `0.72 > 0.05`, so gene `0` is not changed. |
+| `i = 1` | Generate a random value for gene `1`. Suppose it is `0.02`. | `0.02 < 0.05`, so gene `1` is replaced with a random action. |
+| `i = 2` | Generate a random value for gene `2`. Suppose it is `0.31`. | `0.31 > 0.05`, so gene `2` is not changed. |
+
+The loop continues until all 400 genes have been checked. Most genes stay the
+same, but a small number of genes are randomly changed.
+
 Example with mutation rate `0.05`:
 
 ```text
@@ -947,6 +1102,23 @@ Each loop creates up to two children:
 The final `if len(next_generation) < POPULATION_SIZE` check prevents the
 population from becoming larger than 80. This matters because children are
 created in pairs, but the number of remaining slots may be odd.
+
+### Loop Walk-through
+
+At the start of this block, 6 elite policies are already stored in
+`next_generation`.
+
+Example flow:
+
+| While iteration | Start length | What happens | End length |
+|---:|---:|---|---:|
+| `i = 0` | `6` | Select two parents, create two children, mutate them, append both. | `8` |
+| `i = 1` | `8` | Repeat parent selection, crossover, mutation, and append two children. | `10` |
+| `i = 2` | `10` | Repeat the same reproduction process again. | `12` |
+
+The loop continues until the length reaches `80`. Then the condition
+`len(next_generation) < POPULATION_SIZE` becomes false and the function returns
+the completed next generation.
 
 ### How The Step Finishes
 
@@ -1015,6 +1187,29 @@ The order inside one generation is:
 5. Record generation statistics.
 6. Create the next generation.
 
+### Loop Walk-through
+
+The main generation loop is:
+
+```python
+for generation in range(GENERATIONS):
+    ...
+```
+
+Because `GENERATIONS = 60`, the loop variable goes from `0` to `59`. The report
+and output files display generation numbers as `generation + 1`.
+
+Example flow:
+
+| Loop value | Displayed generation | What happens |
+|---:|---:|---|
+| `generation = 0` | Generation `1` | Evaluate the first random population, save `generation_001.npy`, and create generation 2. |
+| `generation = 1` | Generation `2` | Evaluate the new population created from generation 1, save `generation_002.npy`, and create generation 3. |
+| `generation = 2` | Generation `3` | Evaluate the next evolved population, save `generation_003.npy`, and create generation 4. |
+
+The same cycle continues until `generation = 59`, which is displayed as
+generation `60`.
+
 This means that every generation is evaluated before it is used to produce the
 next generation. The algorithm does not mutate or crossover policies before
 they receive a fitness score. Fitness always comes first, and reproduction uses
@@ -1051,7 +1246,7 @@ save_plot(history)
 comparison_history = compare_generation_champions(generation_champions, history)
 save_generation_comparison_results(comparison_history)
 save_comparison_plots(comparison_history)
-np.save("best_individual.npy", best_individual)
+np.save(BEST_INDIVIDUAL_FILE, best_individual)
 randomization_history = analyze_randomization_effects(
     best_individual,
     RANDOMIZATION_SEEDS,
@@ -1063,7 +1258,7 @@ save_randomization_plot(randomization_history)
 The best policy is saved here:
 
 ```python
-np.save("best_individual.npy", best_individual)
+np.save(BEST_INDIVIDUAL_FILE, best_individual)
 ```
 
 ### Detailed Logic
@@ -1074,16 +1269,37 @@ updated throughout training and saved after the loop.
 
 The output files serve different purposes:
 
-- `results.csv` stores training fitness values for each generation.
-- `fitness_plot.png` visualizes best and average training fitness.
-- `generation_champions/generation_XXX.npy` stores each generation champion.
-- `generation_comparison.csv` compares all generation champions using fixed
+- `DATA/results.csv` stores training fitness values for each generation.
+- `DATA/fitness_plot.png` visualizes best and average training fitness.
+- `DATA/generation_champions/generation_XXX.npy` stores each generation champion.
+- `DATA/generation_comparison.csv` compares all generation champions using fixed
   validation seeds.
-- `generation_*_plot.png` files visualize reward, max position, steps to goal,
-  and success rate for generation champions.
-- `best_individual.npy` stores the final best solution.
-- `randomization_effects.csv` and `randomization_effect_plot.png` show how the
-  final best policy behaves under different random seeds.
+- `DATA/generation_*_plot.png` files visualize reward, max position, steps to
+  goal, and success rate for generation champions.
+- `DATA/best_individual.npy` stores the final best solution.
+- `DATA/randomization_effects.csv` and `DATA/randomization_effect_plot.png`
+  show how the final best policy behaves under different random seeds.
+
+### Loop Walk-through: Saving Rows
+
+Several output functions write rows to CSV files. For example, `save_results()`
+writes one row per generation:
+
+```python
+for row in history:
+    writer.writerow(row)
+```
+
+Example flow:
+
+| Loop index | Row written | Meaning |
+|---:|---|---|
+| `i = 0` | `history[0]` | Save the metrics for generation 1. |
+| `i = 1` | `history[1]` | Save the metrics for generation 2. |
+| `i = 2` | `history[2]` | Save the metrics for generation 3. |
+
+The same pattern is used for comparison and randomization CSV outputs. Each row
+is written once, so the saved file directly matches the in-memory history list.
 
 ### How The Step Finishes
 
@@ -1147,6 +1363,28 @@ comparison_row = {
 }
 ```
 
+### Loop Walk-through: Generation Champion Comparison
+
+The comparison loop is:
+
+```python
+for index, champion in enumerate(generation_champions):
+    generation = index + 1
+    validation_summary = evaluate_champion(champion, VALIDATION_SEEDS)
+```
+
+Example flow:
+
+| Loop index | Champion checked | What happens |
+|---:|---|---|
+| `index = 0` | `generation_champions[0]` | Validate the champion from generation 1 using the fixed validation seeds. |
+| `index = 1` | `generation_champions[1]` | Validate the champion from generation 2 using the same validation seeds. |
+| `index = 2` | `generation_champions[2]` | Validate the champion from generation 3 using the same validation seeds. |
+
+The loop continues until every saved generation champion has been evaluated.
+Because all champions use the same validation seeds, their results can be
+compared more fairly.
+
 ### Relevant Code: Randomization Effect Check
 
 ```python
@@ -1172,6 +1410,56 @@ def analyze_randomization_effects(individual, seeds):
         )
 ```
 
+### Loop Walk-through: Seed Generation
+
+The validation seed list uses this formula:
+
+```python
+RANDOM_SEED + 1000 + seed_index
+```
+
+With `RANDOM_SEED = 42`, the first three validation seeds are:
+
+| Loop index | Calculation | Seed |
+|---:|---|---:|
+| `seed_index = 0` | `42 + 1000 + 0` | `1042` |
+| `seed_index = 1` | `42 + 1000 + 1` | `1043` |
+| `seed_index = 2` | `42 + 1000 + 2` | `1044` |
+
+The randomization seed list uses this formula:
+
+```python
+RANDOM_SEED + 2000 + seed_index
+```
+
+With `RANDOM_SEED = 42`, the first three randomization seeds are:
+
+| Loop index | Calculation | Seed |
+|---:|---|---:|
+| `seed_index = 0` | `42 + 2000 + 0` | `2042` |
+| `seed_index = 1` | `42 + 2000 + 1` | `2043` |
+| `seed_index = 2` | `42 + 2000 + 2` | `2044` |
+
+### Loop Walk-through: Randomization Trials
+
+The randomization analysis loop is:
+
+```python
+for trial_index, seed in enumerate(seeds, start=1):
+    episode_result = run_policy_episode(individual, seed=seed)
+    fitness_components = calculate_fitness_components(...)
+```
+
+Example flow:
+
+| Loop index | Seed used | What happens |
+|---:|---:|---|
+| `trial_index = 1` | `2042` | Run the final best policy once with seed `2042`, then store reward, bonuses, and fitness. |
+| `trial_index = 2` | `2043` | Run the same policy with seed `2043`, then store the same metrics. |
+| `trial_index = 3` | `2044` | Run the same policy with seed `2044`, then store the same metrics. |
+
+The loop continues until 20 randomization trials have been recorded.
+
 ### Relevant Code: Visual Program
 
 The separate visualization script loads the saved best policy:
@@ -1183,7 +1471,7 @@ def load_policy(policy_path):
     if not path.exists():
         raise FileNotFoundError(
             f"Policy file '{policy_path}' was not found. "
-            "Run mountain_car_ga.py first to create best_individual.npy."
+            "Run IMPL/mountain_car_ga.py first to create DATA/best_individual.npy."
         )
 
     return np.load(path)
@@ -1229,18 +1517,18 @@ seeds, it is more stable. If it only performs well on one seed, it may be less
 general.
 
 The visualization script serves a different purpose. It does not retrain the
-Genetic Algorithm. Instead, it loads `best_individual.npy` and runs the saved
-policy directly. This allows us to demonstrate the final learned behavior with a
-graphical MountainCar window or save a screenshot for the report.
+Genetic Algorithm. Instead, it loads `DATA/best_individual.npy` and runs the
+saved policy directly. This allows us to demonstrate the final learned behavior
+with a graphical MountainCar window or save a screenshot for the report.
 
 Example commands:
 
 ```powershell
-python visualize_best_solution.py
+python IMPL/visualize_best_solution.py
 ```
 
 ```powershell
-python visualize_best_solution.py --mode screenshot --seed 2042 --output best_solution_screenshot.png
+python IMPL/visualize_best_solution.py --mode screenshot --seed 2042 --output DATA/best_solution_screenshot.png
 ```
 
 ### How The Step Finishes

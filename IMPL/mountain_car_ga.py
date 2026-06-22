@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "DATA"
+
 ENV_NAME = "MountainCar-v0"
 
 POPULATION_SIZE = 80
@@ -47,9 +50,17 @@ RANDOMIZATION_SEEDS = [
     RANDOM_SEED + 2000 + seed_index for seed_index in range(RANDOMIZATION_TRIALS)
 ]
 
-CHAMPIONS_DIR = Path("generation_champions")
-COMPARISON_RESULTS_FILE = "generation_comparison.csv"
-RANDOMIZATION_RESULTS_FILE = "randomization_effects.csv"
+CHAMPIONS_DIR = DATA_DIR / "generation_champions"
+TRAINING_RESULTS_FILE = DATA_DIR / "results.csv"
+COMPARISON_RESULTS_FILE = DATA_DIR / "generation_comparison.csv"
+RANDOMIZATION_RESULTS_FILE = DATA_DIR / "randomization_effects.csv"
+FITNESS_PLOT_FILE = DATA_DIR / "fitness_plot.png"
+BEST_INDIVIDUAL_FILE = DATA_DIR / "best_individual.npy"
+RANDOMIZATION_PLOT_FILE = DATA_DIR / "randomization_effect_plot.png"
+GENERATION_REWARD_PLOT_FILE = DATA_DIR / "generation_reward_plot.png"
+GENERATION_MAX_POSITION_PLOT_FILE = DATA_DIR / "generation_max_position_plot.png"
+GENERATION_STEPS_TO_GOAL_PLOT_FILE = DATA_DIR / "generation_steps_to_goal_plot.png"
+GENERATION_SUCCESS_RATE_PLOT_FILE = DATA_DIR / "generation_success_rate_plot.png"
 RENDER_FINAL_TEST = False
 
 
@@ -334,7 +345,7 @@ def create_next_generation(population, fitness_scores, mutation_rate):
 
 
 def save_generation_champion(individual, generation):
-    CHAMPIONS_DIR.mkdir(exist_ok=True)
+    CHAMPIONS_DIR.mkdir(parents=True, exist_ok=True)
     file_path = CHAMPIONS_DIR / f"generation_{generation:03d}.npy"
     np.save(file_path, individual)
 
@@ -436,6 +447,7 @@ def analyze_randomization_effects(individual, seeds):
 
 
 def train():
+    DATA_DIR.mkdir(exist_ok=True)
     population = create_population()
 
     history = []
@@ -490,7 +502,7 @@ def train():
     comparison_history = compare_generation_champions(generation_champions, history)
     save_generation_comparison_results(comparison_history)
     save_comparison_plots(comparison_history)
-    np.save("best_individual.npy", best_individual)
+    np.save(BEST_INDIVIDUAL_FILE, best_individual)
     randomization_history = analyze_randomization_effects(
         best_individual,
         RANDOMIZATION_SEEDS,
@@ -502,7 +514,9 @@ def train():
 
 
 def save_results(history):
-    with open("results.csv", "w", newline="") as file:
+    DATA_DIR.mkdir(exist_ok=True)
+
+    with open(TRAINING_RESULTS_FILE, "w", newline="") as file:
         writer = csv.DictWriter(
             file,
             fieldnames=[
@@ -522,6 +536,8 @@ def save_results(history):
 
 
 def save_generation_comparison_results(comparison_history):
+    DATA_DIR.mkdir(exist_ok=True)
+
     with open(COMPARISON_RESULTS_FILE, "w", newline="") as file:
         writer = csv.DictWriter(
             file,
@@ -550,6 +566,8 @@ def save_generation_comparison_results(comparison_history):
 
 
 def save_randomization_results(randomization_history):
+    DATA_DIR.mkdir(exist_ok=True)
+
     with open(RANDOMIZATION_RESULTS_FILE, "w", newline="") as file:
         writer = csv.DictWriter(
             file,
@@ -576,6 +594,8 @@ def save_randomization_results(randomization_history):
 
 
 def save_plot(history):
+    DATA_DIR.mkdir(exist_ok=True)
+
     generations = [row["generation"] for row in history]
     best_values = [row["best_fitness"] for row in history]
     average_values = [row["average_fitness"] for row in history]
@@ -588,7 +608,7 @@ def save_plot(history):
     plt.title("Genetic Algorithm Progress on MountainCar-v0")
     plt.legend()
     plt.grid(True)
-    plt.savefig("fitness_plot.png")
+    plt.savefig(FITNESS_PLOT_FILE)
     plt.close()
 
 
@@ -600,6 +620,8 @@ def save_metric_plot(
     filename,
     value_scale=1.0,
 ):
+    DATA_DIR.mkdir(exist_ok=True)
+
     generations = [row["generation"] for row in comparison_history]
     values = [row[value_key] * value_scale for row in comparison_history]
 
@@ -615,6 +637,8 @@ def save_metric_plot(
 
 
 def save_randomization_plot(randomization_history):
+    DATA_DIR.mkdir(exist_ok=True)
+
     trials = [row["trial"] for row in randomization_history]
     rewards = [row["total_reward"] for row in randomization_history]
     progress_bonuses = [row["progress_bonus"] for row in randomization_history]
@@ -646,7 +670,7 @@ def save_randomization_plot(randomization_history):
 
     figure.suptitle("Randomization Effects on Reward and Fitness Bonuses")
     figure.tight_layout()
-    figure.savefig("randomization_effect_plot.png")
+    figure.savefig(RANDOMIZATION_PLOT_FILE)
     plt.close(figure)
 
 
@@ -656,28 +680,28 @@ def save_comparison_plots(comparison_history):
         "validation_average_reward",
         "Average reward",
         "Validation Reward of Each Generation Champion",
-        "generation_reward_plot.png",
+        GENERATION_REWARD_PLOT_FILE,
     )
     save_metric_plot(
         comparison_history,
         "validation_average_max_position",
         "Average max position",
         "Max Position of Each Generation Champion",
-        "generation_max_position_plot.png",
+        GENERATION_MAX_POSITION_PLOT_FILE,
     )
     save_metric_plot(
         comparison_history,
         "validation_average_steps_to_goal",
         "Average steps to goal",
         "Steps to Goal of Each Generation Champion",
-        "generation_steps_to_goal_plot.png",
+        GENERATION_STEPS_TO_GOAL_PLOT_FILE,
     )
     save_metric_plot(
         comparison_history,
         "validation_success_rate",
         "Success rate (%)",
         "Success Rate of Each Generation Champion",
-        "generation_success_rate_plot.png",
+        GENERATION_SUCCESS_RATE_PLOT_FILE,
         value_scale=100,
     )
 
@@ -741,14 +765,14 @@ if __name__ == "__main__":
     test_individual(best_individual, render=RENDER_FINAL_TEST)
 
     print("\nSaved files:")
-    print("- results.csv")
-    print("- fitness_plot.png")
-    print("- best_individual.npy")
-    print("- generation_champions/generation_XXX.npy")
-    print("- generation_comparison.csv")
-    print("- generation_reward_plot.png")
-    print("- generation_max_position_plot.png")
-    print("- generation_steps_to_goal_plot.png")
-    print("- generation_success_rate_plot.png")
-    print("- randomization_effects.csv")
-    print("- randomization_effect_plot.png")
+    print("- DATA/results.csv")
+    print("- DATA/fitness_plot.png")
+    print("- DATA/best_individual.npy")
+    print("- DATA/generation_champions/generation_XXX.npy")
+    print("- DATA/generation_comparison.csv")
+    print("- DATA/generation_reward_plot.png")
+    print("- DATA/generation_max_position_plot.png")
+    print("- DATA/generation_steps_to_goal_plot.png")
+    print("- DATA/generation_success_rate_plot.png")
+    print("- DATA/randomization_effects.csv")
+    print("- DATA/randomization_effect_plot.png")

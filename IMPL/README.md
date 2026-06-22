@@ -44,10 +44,10 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install the required packages:
+Install the required packages from the project root:
 
 ```powershell
-pip install -r requirements.txt
+pip install -r IMPL/requirements.txt
 ```
 
 ## Run
@@ -55,52 +55,52 @@ pip install -r requirements.txt
 Start training with:
 
 ```powershell
-python mountain_car_ga.py
+python IMPL/mountain_car_ga.py
 ```
 
 The script trains the Genetic Algorithm, saves the best final policy, saves the
 best champion from each generation, and compares those generation champions with
-the same validation seeds.
+the same validation seeds. All generated result files are saved in `DATA/`.
 
 ## Visualize Best Solution
 
-After training has created `best_individual.npy`, run the saved best policy in a
-live MountainCar window with:
+After training has created `DATA/best_individual.npy`, run the saved best policy
+in a live MountainCar window with:
 
 ```powershell
-python visualize_best_solution.py
+python IMPL/visualize_best_solution.py
 ```
 
 Save a screenshot of the final rendered frame with:
 
 ```powershell
-python visualize_best_solution.py --mode screenshot --seed 2042 --output best_solution_screenshot.png
+python IMPL/visualize_best_solution.py --mode screenshot --seed 2042 --output DATA/best_solution_screenshot.png
 ```
 
 ## Output Files
 
-- `results.csv`: training fitness values for each generation.
-- `fitness_plot.png`: best and average training fitness over generations.
-- `best_individual.npy`: best policy found during the whole training run.
-- `generation_champions/generation_XXX.npy`: best policy from each generation.
-- `generation_comparison.csv`: validation metrics for each generation champion.
-- `generation_reward_plot.png`: average reward of each generation champion.
-- `generation_max_position_plot.png`: average maximum position reached.
-- `generation_steps_to_goal_plot.png`: average steps to goal, with failed runs
+- `DATA/results.csv`: training fitness values for each generation.
+- `DATA/fitness_plot.png`: best and average training fitness over generations.
+- `DATA/best_individual.npy`: best policy found during the whole training run.
+- `DATA/generation_champions/generation_XXX.npy`: best policy from each generation.
+- `DATA/generation_comparison.csv`: validation metrics for each generation champion.
+- `DATA/generation_reward_plot.png`: average reward of each generation champion.
+- `DATA/generation_max_position_plot.png`: average maximum position reached.
+- `DATA/generation_steps_to_goal_plot.png`: average steps to goal, with failed runs
   counted as `MAX_STEPS`.
-- `generation_success_rate_plot.png`: success rate of each generation champion.
-- `randomization_effects.csv`: reward, progress bonus, goal bonus, and fitness
+- `DATA/generation_success_rate_plot.png`: success rate of each generation champion.
+- `DATA/randomization_effects.csv`: reward, progress bonus, goal bonus, and fitness
   for the best solution under different random seeds.
-- `randomization_effect_plot.png`: plot showing how random seeds affect reward
+- `DATA/randomization_effect_plot.png`: plot showing how random seeds affect reward
   and fitness bonus components.
-- `best_solution_screenshot.png`: screenshot generated from the saved best
+- `DATA/best_solution_screenshot.png`: screenshot generated from the saved best
   policy visualization.
 
 ## What to Check
 
-Use `fitness_plot.png` to confirm that the training process improves over time.
-Then use the generation comparison plots to check whether the best solution from
-each generation actually performs better under the same validation conditions.
-`generation_comparison.csv` contains the exact numerical values used in those
-plots. Use `randomization_effect_plot.png` to check whether the final solution is
-stable across different random seeds.
+Use `DATA/fitness_plot.png` to confirm that the training process improves over
+time. Then use the generation comparison plots to check whether the best
+solution from each generation actually performs better under the same validation
+conditions. `DATA/generation_comparison.csv` contains the exact numerical values
+used in those plots. Use `DATA/randomization_effect_plot.png` to check whether
+the final solution is stable across different random seeds.

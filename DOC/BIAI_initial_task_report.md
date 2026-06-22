@@ -62,16 +62,16 @@ The planned implementation was completed in Python using Gymnasium. The program 
 
 The implementation produces the following output files:
 
-- `results.csv` — numerical results from training
-- `fitness_plot.png` — graph of best and average fitness over generations
-- `best_individual.npy` — saved best evolved policy
+- `DATA/results.csv` — numerical results from training
+- `DATA/fitness_plot.png` — graph of best and average fitness over generations
+- `DATA/best_individual.npy` — saved best evolved policy
 
 Additional comparison outputs were added after the first feedback:
 
-- `generation_comparison.csv`: comparison of each generation champion
-- `randomization_effects.csv`: effect of random seeds on reward and bonuses
+- `DATA/generation_comparison.csv`: comparison of each generation champion
+- `DATA/randomization_effects.csv`: effect of random seeds on reward and bonuses
 - generation comparison plots for reward, max position, steps, and success rate
-- `randomization_effect_plot.png`: randomization effect plot
+- `DATA/randomization_effect_plot.png`: randomization effect plot
 
 ---
 
@@ -213,14 +213,14 @@ To address the feedback about developing a graphical representation of the
 environment, an additional visualization program was added:
 
 ```text
-visualize_best_solution.py
+IMPL/visualize_best_solution.py
 ```
 
 This file does not train the Genetic Algorithm again. Instead, it loads the
 already saved best policy from:
 
 ```text
-best_individual.npy
+DATA/best_individual.npy
 ```
 
 Then it runs the policy inside the `MountainCar-v0` environment so that the
@@ -231,7 +231,7 @@ movement of the car can be observed directly.
 The following command opens a live rendering window:
 
 ```powershell
-python visualize_best_solution.py
+python IMPL/visualize_best_solution.py
 ```
 
 This is useful during the presentation because it shows the best evolved policy
@@ -242,7 +242,7 @@ controlling the car in the actual environment.
 The following command saves the final rendered frame as an image:
 
 ```powershell
-python visualize_best_solution.py --mode screenshot --seed 2042 --output best_solution_screenshot.png
+python IMPL/visualize_best_solution.py --mode screenshot --seed 2042 --output DATA/best_solution_screenshot.png
 ```
 
 The seed controls the initial state of the environment. In this example, seed
@@ -254,7 +254,7 @@ environment state changes with the seed.
 The screenshot below shows the saved best policy reaching the goal area on the
 right hill.
 
-![Best solution reaching the MountainCar goal](best_solution_screenshot.png)
+![Best solution reaching the MountainCar goal](../DATA/best_solution_screenshot.png)
 
 For the screenshot run with seed `2042`, the policy reached the goal in `156`
 steps. The total reward was `-156`, the progress bonus was `500`, and the goal

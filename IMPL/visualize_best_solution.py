@@ -7,6 +7,7 @@ import numpy as np
 
 from mountain_car_ga import (
     ACTION_MEANINGS,
+    DATA_DIR,
     ENV_NAME,
     MAX_STEPS,
     calculate_fitness_components,
@@ -15,8 +16,8 @@ from mountain_car_ga import (
 )
 
 
-DEFAULT_POLICY_FILE = "best_individual.npy"
-DEFAULT_SCREENSHOT_FILE = "best_solution_screenshot.png"
+DEFAULT_POLICY_FILE = DATA_DIR / "best_individual.npy"
+DEFAULT_SCREENSHOT_FILE = DATA_DIR / "best_solution_screenshot.png"
 DEFAULT_SEED = 2042
 
 
@@ -26,7 +27,8 @@ def load_policy(policy_path):
     if not path.exists():
         raise FileNotFoundError(
             f"Policy file '{policy_path}' was not found. "
-            "Run mountain_car_ga.py first to create best_individual.npy."
+            "Run python IMPL/mountain_car_ga.py first to create "
+            "DATA/best_individual.npy."
         )
 
     return np.load(path)
@@ -90,6 +92,8 @@ def save_screenshot(frame, output_path):
     if frame is None:
         raise ValueError("No rendered frame was captured.")
 
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.imsave(output_path, frame)
 
 
