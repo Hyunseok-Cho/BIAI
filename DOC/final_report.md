@@ -5,7 +5,7 @@
 #### BIAI Project
 #### June 2026
 
-## 1. Short Introduction
+## 1. Introduction
 
 This project applies a Genetic Algorithm to solve the `MountainCar-v0`
 environment from the Gymnasium library. The environment contains a car placed in
@@ -47,8 +47,7 @@ velocity.
 | Genetic Algorithm | Evolve a population of policies through selection, crossover, and mutation. | Matches the course topic, easy to visualize over generations, does not require gradients. | Requires many environment evaluations and can be sensitive to fitness design. |
 
 The selected approach is the Genetic Algorithm because the first purpose of the
-project was to understand evolutionary optimization. It is also suitable for
-presentation because the improvement can be shown generation by generation.
+project was to understand evolutionary optimization.
 
 ### 2.2 Selected Methodology
 
@@ -404,6 +403,10 @@ policies are still weak.
 By generation 56, the best training fitness reaches `574.67`. The average
 fitness is also much higher, which means improvement is not limited to one
 individual. The overall population has learned more useful action patterns.
+Training-best and validation-best are different measurements: in this run,
+generation 56 is the training-best generation, while generation 55 is the
+validation-best champion because validation uses fixed seeds and a separate
+evaluation process.
 
 Generation 60 has a slightly lower best fitness than generation 56, but this is
 normal in evolutionary algorithms because crossover and mutation introduce
